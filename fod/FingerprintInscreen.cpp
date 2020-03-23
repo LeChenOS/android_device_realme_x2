@@ -22,6 +22,7 @@
 #include <fstream>
 #include <cmath>
 
+#include <thread>
 
 /* Hardcoded stuffs */
 #define FP_PRESS_PATH "/sys/kernel/oppo_display/notify_fppress"
@@ -61,7 +62,7 @@ namespace inscreen {
 namespace V1_0 {
 namespace implementation {
 
-FingerprintInscreen::FingerprintInscreen() {
+FingerprintInscreen::FingerprintInscreen() : mFingerPressed{false} {
 }
 
 Return<int32_t> FingerprintInscreen::getPositionX() {
@@ -77,21 +78,29 @@ Return<int32_t> FingerprintInscreen::getSize() {
 }
 
 Return<void> FingerprintInscreen::onStartEnroll() {
+    set(DIMLAYER_PATH, FP_BEGIN);
     return Void();
 }
 
 Return<void> FingerprintInscreen::onFinishEnroll() {
+    set(DIMLAYER_PATH, FP_ENDIT);
     return Void();
 }
 
 Return<void> FingerprintInscreen::onPress() {
+    mFingerPressed = true;
     set(DIMLAYER_PATH, FP_BEGIN);
     set(HBM_PATH, FP_BEGIN);
-    set(FP_PRESS_PATH, FP_BEGIN);
+    std::thread([this](){
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    if (mFingerPressed)
+        set(FP_PRESS_PATH, FP_BEGIN);
+    }).detach();
     return Void();
 }
 
 Return<void> FingerprintInscreen::onRelease() {
+    mFingerPressed = false;
     set(FP_PRESS_PATH, FP_ENDIT);
     set(DIMLAYER_PATH, FP_ENDIT);
     set(HBM_PATH, FP_ENDIT);
@@ -123,8 +132,9 @@ Return<void> FingerprintInscreen::setLongPressEnabled(bool) {
     return Void();
 }
 
-Return<int32_t> FingerprintInscreen::getDimAmount(int32_t) {
-    return 0;
+Return<int32_t> FingerprintInscreen::getDimAmount(int32_t brightness) {
+    return(brightness > 500) ? (255 * (1.0 - pow(brightness / 2047.0 * 430.0 / 600.0, 0.455))):
+            (255 * (1.0 - pow(brightness / 1680.0, 0.455))); 
 }
 
 Return<bool> FingerprintInscreen::shouldBoostBrightness() {
